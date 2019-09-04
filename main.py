@@ -141,7 +141,10 @@ class MonitorKill():
         # ahk.run_script(f'msgbox {text}', blocking=False)
         self.ui.info(text)
 
-class MainWindow(QMainWindow, Ui_Form):
+# 希望用系统消息代表循环或timer 来跟踪窗口切换、激活，但实验无效
+# QAbstractNativeEventFilter is for Handling Windows messages
+# https://www.riverbankcomputing.com/pipermail/pyqt/2015-April/035852.html
+class MainWindow(QMainWindow, Ui_Form, QtCore.QAbstractNativeEventFilter):
     def __init__(self):
         # 也可以在初始化时设置flags
         # super(MainWindow, self).__init__(None,  QtCore.Qt.WindowStaysOnTopHint)
@@ -161,6 +164,16 @@ class MainWindow(QMainWindow, Ui_Form):
 
         self.monitor = None
 
+    def nativeEventFilter(self, eventType, message):
+        print(eventType)
+        self.info(str(eventType))
+        if eventType == "windows_generic_MSG" or  eventType == "windows_dispatcher_MSG":
+            msg = ctypes.wintypes.MSG.from_address(message.__int__())
+
+            print("Message Received!" , msg.message )
+            # if msg.message == WM_COPYDATA
+
+        return False, 0
 
     # 通过三个鼠标事件来移动窗口
     # 无边框后窗口的移动方法 https://blog.csdn.net/FanMLei/article/details/79433229
@@ -205,6 +218,7 @@ class MainWindow(QMainWindow, Ui_Form):
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
+    app.installNativeEventFilter(window)
 
     ahk = AHK()
     to_focus = ['evernote.exe', 'pycharm64.exe', ]
