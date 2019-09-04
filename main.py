@@ -85,9 +85,9 @@ class MonitorKill():
 
         current = os.path.basename(current_win.process).lower()
 
-        used_time= round(time.time() - self.last_time, 2)
+        used_time = round(time.time() - self.last_time, 2)
         left_time = self.min_focus_time - used_time
-        self.ui.show_time(used_time,left_time)
+        self.ui.show_time(used_time, left_time)
 
         if current in self.ignore_windows:
             self.msg(f'ignore {current}')
@@ -141,22 +141,51 @@ class MonitorKill():
         # ahk.run_script(f'msgbox {text}', blocking=False)
         self.ui.info(text)
 
-
 class MainWindow(QMainWindow, Ui_Form):
     def __init__(self):
-        super(MainWindow, self).__init__(None, QtCore.Qt.WindowStaysOnTopHint)
+        # 也可以在初始化时设置flags
+        # super(MainWindow, self).__init__(None,  QtCore.Qt.WindowStaysOnTopHint)
+        super(MainWindow, self).__init__(None, )
+        # 无边框
+        self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint);
+        # 透明
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        # 为调用它的控件增加一个遮罩，遮住所选区域以外的部分使之看起来是透明的
+        # https://www.cnblogs.com/dcb3688/p/4237204.html
+        # self.setMask()
+
         self.setupUi(self)
+
         # timer 是必须的，让 MonitorKill 调用。
         self.timer = QtCore.QTimer(self)
 
         self.monitor = None
+
+
+    # 通过三个鼠标事件来移动窗口
+    # 无边框后窗口的移动方法 https://blog.csdn.net/FanMLei/article/details/79433229
+    def mousePressEvent(self, event):
+        if event.button()==QtCore.Qt.LeftButton:
+            self.m_flag=True
+            self.m_Position=event.globalPos()-self.pos() #获取鼠标相对窗口的位置
+            event.accept()
+            self.setCursor(QtGui.QCursor(QtCore.Qt.OpenHandCursor))  #更改鼠标图标
+
+    def mouseMoveEvent(self, QMouseEvent):
+        if QtCore.Qt.LeftButton and self.m_flag:
+            self.move(QMouseEvent.globalPos()-self.m_Position)#更改窗口位置
+            QMouseEvent.accept()
+
+    def mouseReleaseEvent(self, QMouseEvent):
+        self.m_flag=False
+        self.setCursor(QtGui.QCursor(QtCore.Qt.ArrowCursor))
 
     def init(self, m, max):
         self.monitor = m
 
         self.processSlider.setMinimum(0)
         self.processSlider.setMaximum(max)
-        self.show_time(0,max)
+        self.show_time(0, max)
 
     def check(self):
         self.monitor.check()
@@ -168,7 +197,7 @@ class MainWindow(QMainWindow, Ui_Form):
     def info(self, text):
         self.infoLabel.setText(text)
 
-    def show_time(self,used_time, left):
+    def show_time(self, used_time, left):
         self.timeLabel.setText(str(left))
         self.processSlider.setValue(used_time)
 
