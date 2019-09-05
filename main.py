@@ -61,6 +61,9 @@ class MonitorKill():
 
     def start(self):
 
+        if self.monitering:
+            return
+
         self.monitering = True
 
         self.last_time = time.time()
@@ -86,29 +89,34 @@ class MonitorKill():
         current = os.path.basename(current_win.process).lower()
 
         used_time = round(time.time() - self.last_time, 2)
-        left_time = self.min_focus_time - used_time
+        left_time = round(self.min_focus_time - used_time,2)
         self.ui.show_time(used_time, left_time)
 
         if current in self.ignore_windows:
             self.msg(f'ignore {current}')
             return
 
-        if not current_win is self.last_focus_win:
+        # use !=, no 'not is'
+        if current_win != self.last_focus_win:
 
             if current in self.target_windows:
 
                 self.setLast(current_win, current)
 
-            elif self.min_focus_time > time.time() - self.last_time:
+            elif not self.achive_time():
 
                 self.kill(current)
 
-            else:
-                self.win()
+        elif self.achive_time():
+            self.win()
+
+    def achive_time(self):
+        return  self.min_focus_time < time.time() - self.last_time
+
 
     def setLast(self, current_win, current):
 
-        self.msg(f'set {current}')
+        self.msg(f'using {current}')
 
         self.last_focus_win = current_win
         self.last_focus = current
@@ -130,12 +138,14 @@ class MonitorKill():
                 self.last_focus_win.close()
             except WindowNotFoundError:
                 self.msg('win has closed')
-            finally:
-                self.last_focus_win = None
-                self.last_focus = ''
+
+        self.last_focus_win = None
+        self.last_focus = ''
+        self.last_time = time.time()
 
     def win(self):
         self.msg('conga!')
+        self.stop()
 
     def msg(self, text):
         # ahk.run_script(f'msgbox {text}', blocking=False)
@@ -152,17 +162,21 @@ class MainWindow(QMainWindow, Ui_Form, QtCore.QAbstractNativeEventFilter):
         # 无边框
         self.setWindowFlags(QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint);
         # 透明
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        # self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         # 为调用它的控件增加一个遮罩，遮住所选区域以外的部分使之看起来是透明的
         # https://www.cnblogs.com/dcb3688/p/4237204.html
         # self.setMask()
 
+
         self.setupUi(self)
+
+        self.restartBtn.clicked.connect(self.restart)
 
         # timer 是必须的，让 MonitorKill 调用。
         self.timer = QtCore.QTimer(self)
 
         self.monitor = None
+
 
     def nativeEventFilter(self, eventType, message):
         print(eventType)
@@ -214,11 +228,19 @@ class MainWindow(QMainWindow, Ui_Form, QtCore.QAbstractNativeEventFilter):
         self.timeLabel.setText(str(left))
         self.processSlider.setValue(used_time)
 
+    def restart(self):
+        self.monitor.start()
+
 
 if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     app.installNativeEventFilter(window)
+
+    # https://doc.qt.io/qtforpython/PySide2/QtWidgets/QDesktopWidget.html#PySide2.QtWidgets.PySide2.QtWidgets.QDesktopWidget.screenGeometry
+    desktopWidget = app.desktop()
+    screen = desktopWidget.screenGeometry(window)
+    window.setGeometry(screen.width()-400, 30,400,150)
 
     ahk = AHK()
     to_focus = ['evernote.exe', 'pycharm64.exe', ]
